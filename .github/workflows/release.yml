@@ -1,0 +1,26 @@
+name: Package and Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package addon
+        run: |
+          ADDON=Tracky
+          mkdir -p $ADDON
+          cp *.lua *.toc *.xml README.md LICENSE $ADDON/
+          zip -r ${ADDON}-${GITHUB_REF_NAME}.zip $ADDON
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Tracky-${{ github.ref_name }}.zip
