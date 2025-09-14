@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Tracky
+## Notes: Zählt ausgewählte Items (Schneiderei + Verzauberung) mit Zielen, Favoriten, History, Suche, Minimap-Button
+## Author: Grit & Shiro
+## Version: 2.1
+## SavedVariables: TrackyDB, TrackyHistory, TrackyUsage
+TrackyItems.lua
+Tracky.lua
+Tracky.xml

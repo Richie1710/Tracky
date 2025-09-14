@@ -1,0 +1,6 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="TrackyFrame" hidden="false">
+    </Frame>
+    <Frame name="TrackyConfig" hidden="true">
+    </Frame>
+</Ui>
