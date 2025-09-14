@@ -192,6 +192,16 @@ local content = CreateFrame("Frame", nil, scrollFrame)
 content:SetSize(400, 1) -- Breite fix, Höhe dynamisch
 scrollFrame:SetScrollChild(content)
 
+-- Sicherstellen, dass die Eingabefelder vor dem ScrollFrame liegen
+local overlayFixLevel = scrollFrame:GetFrameLevel() + 1
+searchBox:SetFrameLevel(overlayFixLevel)
+recipeBox:SetFrameLevel(overlayFixLevel)
+recipeQty:SetFrameLevel(overlayFixLevel)
+recipeQtyLbl:SetFrameLevel(overlayFixLevel)
+recipeAddBtn:SetFrameLevel(overlayFixLevel)
+addBox:SetFrameLevel(overlayFixLevel)
+addBtn:SetFrameLevel(overlayFixLevel)
+
 config.list = {}
 
 -- passt die ScrollFrame-Größe bei Fenster-Resize an
