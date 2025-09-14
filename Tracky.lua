@@ -70,7 +70,7 @@ textScroll:SetScrollChild(textHolder)
 
 frame.text = textHolder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 frame.text:SetPoint("TOPLEFT", 2, -2)
-frame.text:SetJustifyH("LEFT")
+frame.text:SetJustifyH("CENTER")
 frame.text:SetJustifyV("TOP")
 frame.text:SetText("")
 
@@ -136,7 +136,7 @@ searchBox:SetAutoFocus(false)
 
 local searchMenu = CreateFrame("Frame", "TrackySearchMenu", UIParent, "UIDropDownMenuTemplate")
 
--- === REZEPT-SUCHE (eigenes Feld + Dropdown + Menge) ===
+-- === REZEPT-SUCHE (eigenes Feld + Dropdown + Menge + Hinzufügen) ===
 local recipeLabel = config:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 recipeLabel:SetPoint("TOPLEFT", searchBox, "BOTTOMLEFT", 0, -12)
 recipeLabel:SetText("Rezept suchen (Berufsfenster offen):")
@@ -157,7 +157,16 @@ local recipeQtyLbl = config:CreateFontString(nil, "OVERLAY", "GameFontHighlightS
 recipeQtyLbl:SetPoint("LEFT", recipeQty, "RIGHT", 6, 0)
 recipeQtyLbl:SetText("x craften")
 
+-- NEU: „Hinzufügen“-Button (bestätigt die Auswahl/Eingabe)
+local recipeAddBtn = CreateFrame("Button", nil, config, "UIPanelButtonTemplate")
+recipeAddBtn:SetSize(90, 20)
+recipeAddBtn:SetPoint("LEFT", recipeQtyLbl, "RIGHT", 8, 0)
+recipeAddBtn:SetText("Hinzufügen")
+
 local recipeMenu = CreateFrame("Frame", "TrackyRecipeSearchMenu", UIParent, "UIDropDownMenuTemplate")
+
+-- Merker: zuletzt im Dropdown gewählte Rezept-Index (erst per Button hinzufügen)
+local selectedRecipeIndex = nil
 
 -- === Add-Box ===
 local addLabel = config:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -207,7 +216,6 @@ local function UpdateDisplay()
         local count = GetItemCount(id, false)
         local iconTag = "|T"..(icon or 134400)..":16|t"
         if name then
-            -- Name zuerst, Mengen DANACH
             if goal > 0 then
                 str = str .. iconTag .. " " .. name .. " – " .. count .. " / " .. goal .. "\n"
             else
@@ -278,6 +286,7 @@ function AddItem(id)
 
     if searchBox then searchBox:SetText("") end
     if recipeBox then recipeBox:SetText("") end
+    selectedRecipeIndex = nil
     CloseDropDownMenus()
 
     print("Tracky: ItemID " .. id .. (status == "added" and " hinzugefügt." or " bereits vorhanden."))
@@ -295,9 +304,9 @@ function RefreshConfigList()
 
     local y = -5
 
-       -- Aktuell getrackt
+    -- Aktuell getrackt (Überschrift zentriert)
     local curTitle = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    curTitle:SetPoint("TOPLEFT", 0, y - 10)
+    curTitle:SetPoint("TOP", 0, y - 10)
     curTitle:SetText("Aktuell getrackt:")
     table.insert(config.list, curTitle)
     y = y - 30
@@ -307,64 +316,65 @@ function RefreshConfigList()
         local goal = tonumber(entry.goal or 0) or 0
         local name = GetItemInfo(id) or ("ItemID "..id)
 
+        -- Zeilen-Container: volle Breite, mittig
+        local row = CreateFrame("Frame", nil, content)
+        row:SetSize(content:GetWidth(), 20)
+        row:SetPoint("TOP", 0, y)
+        table.insert(config.list, row)
+
         -- Ziel zuerst (max. 3 Stellen)
-        local goalBox = CreateFrame("EditBox", nil, content, "InputBoxTemplate")
-        goalBox:SetSize(34, 20)               -- schmal: bis zu 3 Ziffern passen
-        goalBox:SetPoint("TOPLEFT", 0, y)
+        local goalBox = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+        goalBox:SetSize(34, 20)
         goalBox:SetAutoFocus(false)
         goalBox:SetNumeric(true)
         if goalBox.SetMaxLetters then goalBox:SetMaxLetters(3) end
         goalBox:SetNumber(math.min(goal, 999))
 
-        -- Sofort-speichern beim Tippen + clamp auf 0..999
-        goalBox:SetScript("OnTextChanged", function(self)
-            local n = tonumber(self:GetText()) or 0
-            if n > 999 then
-                n = 999
-                self:SetNumber(999)
-                self:HighlightText(0, -1)
-            elseif n < 0 then
-                n = 0
-                self:SetNumber(0)
-                self:HighlightText(0, -1)
-            end
-            entry.goal = n
-            UpdateDisplay()
-        end)
-        goalBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-        goalBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-        -- Itemname neben dem Ziel-Feld
-        local label = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        label:SetPoint("LEFT", goalBox, "RIGHT", 6, 0)
+        -- Name (zentriert)
+        local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetJustifyH("CENTER")
+        local nameWidth = math.max(120, row:GetWidth() - 34 - 24 - 40) -- Platz für goalBox + X + Puffer
+        label:SetWidth(nameWidth)
+        label:SetPoint("CENTER", row, "CENTER", 0, 0)
         label:SetText(name)
 
+        -- goalBox links neben dem Namen
+        goalBox:SetPoint("Center", label, "LEFT", -6, 0)
+
         -- Entfernen-Button rechts vom Namen
-        local removeBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+        local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         removeBtn:SetSize(20, 20)
-        removeBtn:SetPoint("LEFT", label, "RIGHT", 6, 0)
         removeBtn:SetText("X")
+        removeBtn:SetPoint("LEFT", label, "RIGHT", 6, 0)
         removeBtn:SetScript("OnClick", function()
             table.remove(items, i)
             RefreshConfigList()
             UpdateDisplay()
         end)
 
-        table.insert(config.list, goalBox)
-        table.insert(config.list, label)
-        table.insert(config.list, removeBtn)
+        -- Live-Update (0..999)
+        goalBox:SetScript("OnTextChanged", function(self)
+            local n = tonumber(self:GetText()) or 0
+            if n > 999 then n = 999; self:SetNumber(999); self:HighlightText(0, -1) end
+            if n < 0 then n = 0; self:SetNumber(0); self:HighlightText(0, -1) end
+            entry.goal = n
+            UpdateDisplay()
+        end)
+        goalBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+        goalBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
-        y = y - 25
+        y = y - 26
     end
 
-    -- 3) Zuletzt genutzt
+    -- Zuletzt genutzt (max 8)
     local histTitle = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     histTitle:SetPoint("TOPLEFT", 0, y - 10)
     histTitle:SetText("Zuletzt genutzt:")
     table.insert(config.list, histTitle)
     y = y - 30
 
-    for _, id in ipairs(TrackyHistory) do
+    for i = 1, math.min(8, #TrackyHistory) do
+        local id = TrackyHistory[i]
         local name = GetItemInfo(id) or ("ItemID "..id)
         local btn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
         btn:SetSize(260, 20)
@@ -575,6 +585,7 @@ local function Tracky_AddRecipeFromLink(link, mult, doFlatten)
             end
             if searchBox then searchBox:SetText("") end
             if recipeBox then recipeBox:SetText("") end
+            selectedRecipeIndex = nil
             CloseDropDownMenus()
             return true
         else
@@ -593,6 +604,7 @@ local function Tracky_AddRecipeFromLink(link, mult, doFlatten)
                     :format(iid, a,u,s,l))
             end
             if recipeBox then recipeBox:SetText("") end
+            selectedRecipeIndex = nil
             CloseDropDownMenus()
             return true
         end
@@ -667,18 +679,11 @@ local function ShowRecipeSearchMenu(anchor, query, doFlatten)
         local mult = tonumber(recipeQty:GetText() or "1") or 1
         for _, r in ipairs(list) do
             table.insert(menu, {
-                text = r.text .. "  x"..mult .. (doFlatten and "  (flatten)" or ""),
+                text = r.text .. "  x"..mult .. "  (zur Auswahl)",
                 notCheckable = true,
                 func = function()
-                    if doFlatten then
-                        Tracky_AddRecipeFlattened(r.index, mult)
-                    else
-                        local a,u,s,l = Tracky_AddRecipeByIndex(r.index, mult)
-                        print(("Tracky: '%s' x%d → %d neu, %d aktualisiert, %d überspr., %d Limit.")
-                            :format(r.name, mult, a,u,s,l))
-                    end
-                    if recipeBox then recipeBox:SetText("") end
-                    CloseDropDownMenus()
+                    selectedRecipeIndex = r.index
+                    if recipeBox then recipeBox:SetText(r.name or "") end
                 end
             })
         end
@@ -724,11 +729,38 @@ addBtn:SetScript("OnClick", function()
     end
 end)
 
+-- NEU: Rezept „Hinzufügen“-Button – fügt erst NACH Bestätigung hinzu (flatten)
+recipeAddBtn:SetScript("OnClick", function()
+    local mult = tonumber(recipeQty:GetText() or "1") or 1
+
+    if selectedRecipeIndex then
+        Tracky_AddRecipeFlattened(selectedRecipeIndex, mult)
+        if recipeBox then recipeBox:SetText("") end
+        selectedRecipeIndex = nil
+        CloseDropDownMenus()
+        return
+    end
+
+    local text = recipeBox:GetText()
+    if text and text ~= "" then
+        if Tracky_AddRecipeFromLink(text, mult, true) then
+            if recipeBox then recipeBox:SetText("") end
+            selectedRecipeIndex = nil
+            CloseDropDownMenus()
+            return
+        end
+    end
+
+    print("Tracky: Bitte Rezept aus dem Dropdown wählen oder per Shift-Klick Link ins Feld setzen, dann 'Hinzufügen'.")
+end)
+
 -- Sucheingaben → Dropdowns
 searchBox:SetScript("OnTextChanged", function(self)
     ShowItemSearchMenu(self, self:GetText() or "")
 end)
 recipeBox:SetScript("OnTextChanged", function(self)
+    -- Freitexteingabe löscht bewusste Dropdown-Auswahl, bis erneut gewählt wird
+    selectedRecipeIndex = nil
     ShowRecipeSearchMenu(self, self:GetText() or "", true)
 end)
 
@@ -743,6 +775,7 @@ function ChatEdit_InsertLink(text)
     if addBox:HasFocus() and text then
         addBox:SetText(text); addBox:SetFocus(); return true
     elseif searchBox:HasFocus() and text then
+        -- Items im Suchfeld dürfen weiterhin sofort hinzugefügt werden, wenn möglich
         if Tracky_AddRecipeFromLink(text, 1, true) then
             if searchBox then searchBox:SetText("") end
             searchBox:SetFocus()
@@ -751,14 +784,11 @@ function ChatEdit_InsertLink(text)
         end
         searchBox:SetText(text); searchBox:SetFocus(); return true
     elseif recipeBox:HasFocus() and text then
-        local mult = tonumber(recipeQty:GetText() or "1") or 1
-        if Tracky_AddRecipeFromLink(text, mult, true) then
-            if recipeBox then recipeBox:SetText("") end
-            recipeBox:SetFocus()
-            CloseDropDownMenus()
-            return true
-        end
-        recipeBox:SetText(text); recipeBox:SetFocus(); return true
+        -- NEU: Im Rezeptfeld nur EINTRAGEN, nicht sofort hinzufügen.
+        recipeBox:SetText(text)
+        recipeBox:SetFocus()
+        selectedRecipeIndex = nil
+        return true
     end
     return orig_ChatEdit_InsertLink(text)
 end
@@ -988,6 +1018,8 @@ TrackyRecipeEvt:SetScript("OnEvent", function(self, ev)
         if TrackyRecipePane then TrackyRecipePane:Show() end
     elseif ev == "TRADE_SKILL_CLOSE" then
         if TrackyRecipePane then TrackyRecipePane:Hide() end
+        -- Beim Schließen Auswahl zurücksetzen
+        selectedRecipeIndex = nil
     end
 end)
 
