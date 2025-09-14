@@ -153,7 +153,9 @@ recipeQty:SetNumeric(true)
 recipeQty:SetAutoFocus(false)
 recipeQty:SetNumber(1)
 
-local recipeQtyLbl = config:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+-- Label neben der Mengen-Eingabe. Als Kind von recipeQty erzeugt, damit es
+-- automatisch dessen Frame-Level übernimmt.
+local recipeQtyLbl = recipeQty:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 recipeQtyLbl:SetPoint("LEFT", recipeQty, "RIGHT", 6, 0)
 recipeQtyLbl:SetText("x craften")
 
@@ -197,7 +199,6 @@ local overlayFixLevel = scrollFrame:GetFrameLevel() + 1
 searchBox:SetFrameLevel(overlayFixLevel)
 recipeBox:SetFrameLevel(overlayFixLevel)
 recipeQty:SetFrameLevel(overlayFixLevel)
-recipeQtyLbl:SetFrameLevel(overlayFixLevel)
 recipeAddBtn:SetFrameLevel(overlayFixLevel)
 addBox:SetFrameLevel(overlayFixLevel)
 addBtn:SetFrameLevel(overlayFixLevel)
